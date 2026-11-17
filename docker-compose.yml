@@ -1,0 +1,58 @@
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pegada_kids
+      POSTGRES_USER: pegada
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_DBPASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pegada -d pegada_kids"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: "3333"
+      DATABASE_URL: "postgresql://pegada:${SERVICE_PASSWORD_64_DBPASSWORD}@db:5432/pegada_kids"
+      FRONTEND_URL: ${FRONTEND_URL:?}
+      AUTH_SECRET: ${SERVICE_HEX_64_AUTHSECRET}
+      ADMIN_NAME: "Administrador Pegada Kids"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?}
+      ADMIN_PASSWORD: ${SERVICE_PASSWORD_64_ADMINPASSWORD}
+      TCC_DEMO_MODE: "true"
+      EXPOSE_PASSWORD_RESET_LINK: "false"
+      MERCADOPAGO_ACCESS_TOKEN: ""
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    expose:
+      - "3333"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?}
+        NEXT_PUBLIC_TCC_DEMO_MODE: "true"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_TCC_DEMO_MODE: "true"
+    depends_on:
+      - backend
+    expose:
+      - "3000"
+
+volumes:
+  pgdata:
+  uploads_data:
